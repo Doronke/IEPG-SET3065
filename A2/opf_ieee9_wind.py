@@ -2,7 +2,9 @@ import pandapower as pp, pandas as pd
 import matplotlib.pyplot as plt
 pd.options.display.max_columns = None
 
-net = pp.from_excel('ieee9-wind.xlsx')
+net_base = pp.from_excel(
+    r'C:/Users/dagma/Documents/Master/SET3065 Intelligent Electrical Power Grids/IEPG-SET3065-main/A2/ieee9-wind.xlsx'
+)
 
 # Running the optimization power flow problem
 pp.runopp(net, init='pf',verbose=False)
