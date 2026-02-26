@@ -2,7 +2,7 @@ import pandapower as pp, pandas as pd
 import matplotlib.pyplot as plt
 pd.options.display.max_columns = None
 
-net = pp.from_excel('ieee9-wind.xlsx')
+net = pp.from_excel('./A2/ieee9-wind.xlsx')
 
 # Running the optimization power flow problem
 pp.runopp(net, init='pf',verbose=False)
@@ -14,5 +14,12 @@ voltages = net.res_bus.vm_pu.to_list()
 ax1.bar(range(len(voltages)), voltages)
 ax1.set_xlabel("Bus Index")
 ax1.set_ylabel("Voltage (pu)")
+plt.show()
 
 # TO DO: plot line losses 
+line_losses = net.res_line.loading_percent.to_list()
+fig, ax2 = plt.subplots(1,1)
+ax2.bar(range(len(line_losses)), line_losses)
+ax2.set_xlabel("Line Index")
+ax2.set_ylabel("Line Losses (%)")
+plt.show()

@@ -5,7 +5,7 @@ import numpy as np
 import random
 numba = False
 
-net = pp.from_excel('ieee9-wind.xlsx')
+net = pp.from_excel('./A2/ieee9-wind.xlsx')
 
 # --------------------------------------------------------------------
 # Step 1: initialize data:
