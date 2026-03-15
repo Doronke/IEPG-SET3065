@@ -39,6 +39,29 @@ matplotlib.use('Agg')          # non-interactive: save to file, no pop-up window
 import matplotlib.pyplot as plt
 import numpy as np
 
+# ── Journal-quality figure style ──────────────────────────────────────────────
+plt.rcParams.update({
+    'font.family':        'DejaVu Sans',
+    'font.size':          13,
+    'axes.titlesize':     14,
+    'axes.titleweight':   'bold',
+    'axes.labelsize':     13,
+    'xtick.labelsize':    11,
+    'ytick.labelsize':    11,
+    'legend.fontsize':    11,
+    'legend.framealpha':  0.9,
+    'legend.edgecolor':   '0.7',
+    'lines.linewidth':    2.2,
+    'lines.markersize':   8,
+    'axes.grid':          True,
+    'grid.alpha':         0.35,
+    'grid.linestyle':     '--',
+    'axes.spines.top':    False,
+    'axes.spines.right':  False,
+    'figure.dpi':         150,
+    'savefig.dpi':        300,
+})
+
 warnings.filterwarnings('ignore')
 pd.options.display.max_columns = None
 
@@ -52,11 +75,11 @@ os.makedirs(FIG_DIR, exist_ok=True)
 
 # Reuse filename helpers from assignment2_wind_scenarios.py
 slug    = lambda s: re.sub(r'[^\w]+', '_', s).strip('_')
-savefig = lambda name: plt.savefig(os.path.join(FIG_DIR, name), dpi=150,
+savefig = lambda name: plt.savefig(os.path.join(FIG_DIR, name), dpi=300,
                                    bbox_inches='tight')
 
 # ── load reference network ────────────────────────────────────────────────────
-BASE_NET       = pp.from_excel('./A2/ieee9-wind.xlsx')
+BASE_NET       = pp.from_excel('./ieee9-wind.xlsx')
 WIND_TRAFO_IDX = 3     # trafo row that couples the wind subsystem to the 230 kV ring
 
 N_BUSES  = len(BASE_NET.bus)
@@ -281,16 +304,16 @@ def errorbar_plot(ax, data_dict, idx, data_key, title, ylabel,
         ax.errorbar(idx, mean_v, yerr=std_v,
                     fmt=MARKERS[j % len(MARKERS)] + '-',
                     color=COLORS[j % len(COLORS)],
-                    capsize=3, linewidth=1.5, markersize=5,
+                    capsize=5, linewidth=2.2, markersize=8,
                     label=f"{label}  (n={res['n_conv']})")
     if hline is not None:
         ax.axhline(hline, color=hline_color, linestyle='--',
-                   linewidth=1.2, label=hline_label, zorder=0)
-    ax.set_title(title, fontsize=10)
+                   linewidth=1.8, label=hline_label, zorder=0)
+    ax.set_title(title)
     ax.set_ylabel(ylabel)
     if xticklabels is not None:
         ax.set_xticks(idx)
-        ax.set_xticklabels(xticklabels, fontsize=8)
+        ax.set_xticklabels(xticklabels, rotation=45, ha='right')
     else:
         ax.set_xticks(idx)
 
@@ -327,10 +350,10 @@ def boxplot_comparison(ax, data_dict, idx, data_key, title, ylabel,
         ax.boxplot(
             bp_data, positions=positions, widths=box_w * 0.85,
             patch_artist=True, showfliers=False,
-            boxprops=dict(facecolor=color, alpha=0.5),
-            medianprops=dict(color='black', linewidth=1.5),
-            whiskerprops=dict(color=color),
-            capprops=dict(color=color),
+            boxprops=dict(facecolor=color, alpha=0.55, linewidth=1.5),
+            medianprops=dict(color='black', linewidth=2.2),
+            whiskerprops=dict(color=color, linewidth=1.8),
+            capprops=dict(color=color, linewidth=1.8),
         )
         # Proxy artist for the legend
         ax.plot([], [], color=color, linewidth=5, alpha=0.5,
@@ -338,18 +361,19 @@ def boxplot_comparison(ax, data_dict, idx, data_key, title, ylabel,
 
     if hline is not None:
         ax.axhline(hline, color='red', linestyle='--',
-                   linewidth=1.2, label=hline_label, zorder=0)
-    ax.set_title(title, fontsize=10)
+                   linewidth=1.8, label=hline_label, zorder=0)
+    ax.set_title(title)
     ax.set_ylabel(ylabel)
     if xticklabels is not None:
         ax.set_xticks(np.arange(n_el))
-        ax.set_xticklabels(xticklabels, fontsize=8)
+        ax.set_xticklabels(xticklabels, rotation=45, ha='right')
     else:
         ax.set_xticks(np.arange(n_el))
 
 # =============================================================================
 # Figure set A: per-location comparison of PF modes
 # (3 figures, one per wind location – shows effect of reactive power mode)
+# Voltage charts now display variability only (box plots); mean plots removed.
 # For each location compare Unit PF vs Overexcited vs Underexcited.
 # =============================================================================
 bus_idx   = np.arange(N_BUSES)
@@ -361,43 +385,28 @@ line_ticks  = [f"L{i}" for i in range(N_LINES)]
 for loc_label in WIND_LOCATIONS:
     subset = {pf: all_results[(loc_label, pf)] for pf in PF_MODES}
 
-    # ── A1: Voltage magnitude – mean ± std and box plots ─────────────────────
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6), constrained_layout=True)
-
-    # Left panel: mean ± std (quick comparison of level and spread)
-    errorbar_plot(
-        axes[0], subset, bus_idx, 'vm_pu',
-        f"Voltage Mean ± Std  |  Wind @ {loc_label}",
-        "Voltage (pu)",
-        hline=1.05, hline_label="V$_{max}$ = 1.05 pu",
-        xticklabels=bus_ticks,
-    )
-    axes[0].axhline(0.95, color='blue', linestyle='--', linewidth=1.2,
-                    label='V$_{min}$ = 0.95 pu')
-    axes[0].set_ylim(0.88, 1.12)
-    axes[0].legend(fontsize=7, loc='lower right')
-
-    # Right panel: box plots (full distribution; reveals skew and outliers)
+    # ── A1: Voltage variability only – box plots for PF-mode comparison ───
+    fig, ax = plt.subplots(figsize=(16, 7), constrained_layout=True)
     boxplot_comparison(
-        axes[1], subset, bus_idx, 'vm_pu',
-        f"Voltage Distribution  |  Wind @ {loc_label}",
+        ax, subset, bus_idx, 'vm_pu',
+        f"Voltage Variability  |  Wind @ {loc_label}",
         "Voltage (pu)",
         hline=1.05, hline_label="V$_{max}$ = 1.05 pu",
         xticklabels=bus_ticks,
     )
-    axes[1].axhline(0.95, color='blue', linestyle='--', linewidth=1.2,
-                    label='V$_{min}$ = 0.95 pu')
-    axes[1].set_ylim(0.88, 1.12)
-    axes[1].legend(fontsize=7, loc='lower right')
+    ax.axhline(0.95, color='blue', linestyle='--', linewidth=1.8,
+               label='V$_{min}$ = 0.95 pu')
+    ax.set_ylim(0.88, 1.12)
+    ax.legend(loc='lower right')
 
     fig.suptitle(
         f"Voltage Variability – PF Mode Comparison  |  Wind @ {loc_label}  (N=100)",
-        fontsize=12, fontweight='bold')
-    savefig(f"A_voltage_pfmodes_{slug(loc_label)}.png")
+        fontsize=15, fontweight='bold')
+    savefig(f"A_voltage_variability_pfmodes_{slug(loc_label)}.png")
     plt.close()
 
     # ── A2: Branch loading – lines + trafos ──────────────────────────────────
-    fig, axes = plt.subplots(2, 1, figsize=(14, 11), constrained_layout=True)
+    fig, axes = plt.subplots(2, 1, figsize=(14, 12), constrained_layout=True)
 
     errorbar_plot(
         axes[0], subset, line_idx, 'line_load',
@@ -407,7 +416,7 @@ for loc_label in WIND_LOCATIONS:
         xticklabels=line_ticks,
     )
     axes[0].set_ylim(bottom=0)
-    axes[0].legend(fontsize=7, loc='upper right')
+    axes[0].legend(loc='upper right')
 
     errorbar_plot(
         axes[1], subset, trafo_idx, 'trafo_load',
@@ -417,57 +426,45 @@ for loc_label in WIND_LOCATIONS:
         xticklabels=trafo_ticks,
     )
     axes[1].set_ylim(bottom=0)
-    axes[1].legend(fontsize=7, loc='upper right')
+    axes[1].legend(loc='upper right')
 
     fig.suptitle(
         f"Branch Loading – PF Mode Comparison  |  Wind @ {loc_label}  (N=100)",
-        fontsize=12, fontweight='bold')
+        fontsize=15, fontweight='bold')
     savefig(f"A_branch_pfmodes_{slug(loc_label)}.png")
     plt.close()
 
 # =============================================================================
 # Figure set B: per-PF-mode comparison of wind locations
 # (3 figures, one per PF mode – shows effect of wind location)
+# Voltage charts now display variability only (box plots); mean plots removed.
 # For each PF mode compare Default vs Bus 5 vs Bus 7.
 # =============================================================================
 for pf_label in PF_MODES:
     subset = {loc: all_results[(loc, pf_label)] for loc in WIND_LOCATIONS}
 
-    # ── B1: Voltage ───────────────────────────────────────────────────────────
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6), constrained_layout=True)
-
-    errorbar_plot(
-        axes[0], subset, bus_idx, 'vm_pu',
-        f"Voltage Mean ± Std  |  {pf_label}",
-        "Voltage (pu)",
-        hline=1.05, hline_label="V$_{max}$ = 1.05 pu",
-        xticklabels=bus_ticks,
-    )
-    axes[0].axhline(0.95, color='blue', linestyle='--', linewidth=1.2,
-                    label='V$_{min}$ = 0.95 pu')
-    axes[0].set_ylim(0.88, 1.12)
-    axes[0].legend(fontsize=7, loc='lower right')
-
+    # ── B1: Voltage variability only – box plot comparison of locations  ───
+    fig, ax = plt.subplots(figsize=(16, 7), constrained_layout=True)
     boxplot_comparison(
-        axes[1], subset, bus_idx, 'vm_pu',
-        f"Voltage Distribution  |  {pf_label}",
+        ax, subset, bus_idx, 'vm_pu',
+        f"Voltage Variability  |  {pf_label}",
         "Voltage (pu)",
         hline=1.05, hline_label="V$_{max}$ = 1.05 pu",
         xticklabels=bus_ticks,
     )
-    axes[1].axhline(0.95, color='blue', linestyle='--', linewidth=1.2,
-                    label='V$_{min}$ = 0.95 pu')
-    axes[1].set_ylim(0.88, 1.12)
-    axes[1].legend(fontsize=7, loc='lower right')
+    ax.axhline(0.95, color='blue', linestyle='--', linewidth=1.8,
+               label='V$_{min}$ = 0.95 pu')
+    ax.set_ylim(0.88, 1.12)
+    ax.legend(loc='lower right')
 
     fig.suptitle(
         f"Voltage Variability – Location Comparison  |  {pf_label}  (N=100)",
-        fontsize=12, fontweight='bold')
-    savefig(f"B_voltage_location_{slug(pf_label)}.png")
+        fontsize=15, fontweight='bold')
+    savefig(f"B_voltage_variability_location_{slug(pf_label)}.png")
     plt.close()
 
     # ── B2: Branch loading ────────────────────────────────────────────────────
-    fig, axes = plt.subplots(2, 1, figsize=(14, 11), constrained_layout=True)
+    fig, axes = plt.subplots(2, 1, figsize=(14, 12), constrained_layout=True)
 
     errorbar_plot(
         axes[0], subset, line_idx, 'line_load',
@@ -476,7 +473,7 @@ for pf_label in PF_MODES:
         xticklabels=line_ticks,
     )
     axes[0].set_ylim(bottom=0)
-    axes[0].legend(fontsize=7, loc='upper right')
+    axes[0].legend(loc='upper right')
 
     errorbar_plot(
         axes[1], subset, trafo_idx, 'trafo_load',
@@ -485,11 +482,11 @@ for pf_label in PF_MODES:
         xticklabels=trafo_ticks,
     )
     axes[1].set_ylim(bottom=0)
-    axes[1].legend(fontsize=7, loc='upper right')
+    axes[1].legend(loc='upper right')
 
     fig.suptitle(
         f"Branch Loading – Location Comparison  |  {pf_label}  (N=100)",
-        fontsize=12, fontweight='bold')
+        fontsize=15, fontweight='bold')
     savefig(f"B_branch_location_{slug(pf_label)}.png")
     plt.close()
 
@@ -498,7 +495,7 @@ for pf_label in PF_MODES:
 # Bar chart showing mean std(vm_pu) per scenario.
 # A lower value means the voltage profile is more predictable (less uncertain).
 # =============================================================================
-fig, ax = plt.subplots(figsize=(12, 5))
+fig, ax = plt.subplots(figsize=(14, 6))
 scenario_labels = [f"{l}\n{p}" for (l, p) in all_results.keys()]
 mean_stds = [
     res['vm_pu'].std(axis=0).mean() if res['vm_pu'].size > 0 else 0.0
@@ -506,36 +503,34 @@ mean_stds = [
 ]
 bar_colors = [COLORS[i % len(COLORS)] for i in range(len(scenario_labels))]
 bars = ax.bar(range(len(scenario_labels)), mean_stds,
-              color=bar_colors, edgecolor='k', linewidth=0.5, alpha=0.8)
+              color=bar_colors, edgecolor='k', linewidth=0.8, alpha=0.85)
 
-# Mark the baseline bar with a star annotation
+# Mark the baseline bar with an annotation
 baseline_key = ("Default (Bus 8)", "Unit PF (Q=0)")
 baseline_idx  = list(all_results.keys()).index(baseline_key)
 ax.annotate("Baseline", xy=(baseline_idx, mean_stds[baseline_idx]),
-            xytext=(baseline_idx, mean_stds[baseline_idx] + 0.001),
-            ha='center', fontsize=8, color='black',
-            arrowprops=dict(arrowstyle='->', color='black'))
+            xytext=(baseline_idx, mean_stds[baseline_idx] + 0.0012),
+            ha='center', fontsize=12, fontweight='bold', color='black',
+            arrowprops=dict(arrowstyle='->', lw=1.5, color='black'))
 
 ax.set_xticks(range(len(scenario_labels)))
-ax.set_xticklabels(scenario_labels, fontsize=7)
+ax.set_xticklabels(scenario_labels, fontsize=11)
 ax.set_ylabel("Mean Voltage Std (pu)  [lower = more stable]")
 ax.set_title("Voltage Variability Summary – All Scenarios  (N=100 PPF samples)",
-             fontsize=11, fontweight='bold')
-ax.grid(axis='y', linestyle='--', alpha=0.5)
+             fontsize=15, fontweight='bold')
 plt.tight_layout()
 savefig("C_voltage_std_summary.png")
 plt.close()
 
 # =============================================================================
-# Figure D: Baseline vs all other scenarios – direct delta comparison
-# Shows Δmean(V) and Δstd(V) vs the baseline for every bus.
+# Figure D: Baseline vs all other scenarios – variability delta only
+# Shows Δstd(V) vs the baseline for every bus (mean differences dropped).
 # Baseline = Default (Bus 8) | Unit PF (Q=0)  (= prob_opf_ieee9_wind.py)
 # =============================================================================
 baseline_res = all_results[baseline_key]
-baseline_mean = baseline_res['vm_pu'].mean(axis=0)
 baseline_std  = baseline_res['vm_pu'].std(axis=0)
 
-fig, axes = plt.subplots(2, 1, figsize=(14, 10), constrained_layout=True)
+fig, ax = plt.subplots(figsize=(14, 6), constrained_layout=True)
 for j, (key, res) in enumerate(all_results.items()):
     if key == baseline_key:
         continue   # skip baseline itself
@@ -543,30 +538,20 @@ for j, (key, res) in enumerate(all_results.items()):
         continue
     loc_label, pf_label = key
     label = f"{loc_label} | {pf_label}  (n={res['n_conv']})"
-    delta_mean = res['vm_pu'].mean(axis=0) - baseline_mean
     delta_std  = res['vm_pu'].std(axis=0)  - baseline_std
+    ax.plot(bus_idx, delta_std, MARKERS[j % len(MARKERS)] + '-',
+            color=COLORS[j % len(COLORS)], linewidth=2.2, markersize=8,
+            label=label)
 
-    axes[0].plot(bus_idx, delta_mean, MARKERS[j % len(MARKERS)] + '-',
-                 color=COLORS[j % len(COLORS)], linewidth=1.5, markersize=5,
-                 label=label)
-    axes[1].plot(bus_idx, delta_std, MARKERS[j % len(MARKERS)] + '-',
-                 color=COLORS[j % len(COLORS)], linewidth=1.5, markersize=5,
-                 label=label)
+ax.axhline(0, color='black', linewidth=1.8, linestyle='--', label='Baseline')
+ax.set_title("Δ Voltage Std vs Baseline (positive = more variable)")
+ax.set_ylabel("Δ V_std (pu)")
+ax.set_xticks(bus_idx)
+ax.set_xticklabels(bus_ticks, rotation=45, ha='right')
+ax.legend(loc='best')
 
-for ax, title, ylabel in [
-    (axes[0], "Δ Mean Voltage vs Baseline (positive = higher voltage)", "Δ V_mean (pu)"),
-    (axes[1], "Δ Voltage Std vs Baseline (positive = more variable)", "Δ V_std (pu)"),
-]:
-    ax.axhline(0, color='black', linewidth=1.0, linestyle='--', label='Baseline')
-    ax.set_title(title, fontsize=10)
-    ax.set_ylabel(ylabel)
-    ax.set_xticks(bus_idx)
-    ax.set_xticklabels(bus_ticks, fontsize=8)
-    ax.legend(fontsize=7, loc='best')
-    ax.grid(axis='y', linestyle='--', alpha=0.4)
-
-fig.suptitle("Deviation from Baseline – Voltage Mean and Variability  (N=100)",
-             fontsize=12, fontweight='bold')
+fig.suptitle("Deviation from Baseline – Voltage Variability  (N=100)",
+             fontsize=15, fontweight='bold')
 savefig("D_voltage_delta_vs_baseline.png")
 plt.close()
 
@@ -577,7 +562,7 @@ plt.close()
 baseline_ll_mean = baseline_res['line_load'].mean(axis=0)
 baseline_tl_mean = baseline_res['trafo_load'].mean(axis=0)
 
-fig, axes = plt.subplots(2, 1, figsize=(14, 10), constrained_layout=True)
+fig, axes = plt.subplots(2, 1, figsize=(14, 11), constrained_layout=True)
 for j, (key, res) in enumerate(all_results.items()):
     if key == baseline_key:
         continue
@@ -588,27 +573,87 @@ for j, (key, res) in enumerate(all_results.items()):
     delta_ll = res['line_load'].mean(axis=0)  - baseline_ll_mean
     delta_tl = res['trafo_load'].mean(axis=0) - baseline_tl_mean
     axes[0].plot(line_idx,  delta_ll, MARKERS[j % len(MARKERS)] + '-',
-                 color=COLORS[j % len(COLORS)], linewidth=1.5, markersize=5,
+                 color=COLORS[j % len(COLORS)], linewidth=2.2, markersize=8,
                  label=label)
     axes[1].plot(trafo_idx, delta_tl, MARKERS[j % len(MARKERS)] + '-',
-                 color=COLORS[j % len(COLORS)], linewidth=1.5, markersize=5,
+                 color=COLORS[j % len(COLORS)], linewidth=2.2, markersize=8,
                  label=label)
 
 for ax, idx_arr, ticks, title, ylabel in [
     (axes[0], line_idx,  line_ticks,  "Δ Mean Line  Loading vs Baseline", "Δ Loading (%)"),
     (axes[1], trafo_idx, trafo_ticks, "Δ Mean Trafo Loading vs Baseline", "Δ Loading (%)"),
 ]:
-    ax.axhline(0, color='black', linewidth=1.0, linestyle='--', label='Baseline')
-    ax.set_title(title, fontsize=10)
+    ax.axhline(0, color='black', linewidth=1.8, linestyle='--', label='Baseline')
+    ax.set_title(title)
     ax.set_ylabel(ylabel)
     ax.set_xticks(idx_arr)
-    ax.set_xticklabels(ticks, fontsize=8)
-    ax.legend(fontsize=7, loc='best')
-    ax.grid(axis='y', linestyle='--', alpha=0.4)
+    ax.set_xticklabels(ticks, rotation=45, ha='right')
+    ax.legend(loc='best')
 
 fig.suptitle("Deviation from Baseline – Branch Loading  (N=100)",
-             fontsize=12, fontweight='bold')
+             fontsize=15, fontweight='bold')
 savefig("E_branch_delta_vs_baseline.png")
+plt.close()
+
+# =============================================================================
+# Figure F: Branch Loading Summary – all scenarios
+# Two bar charts: mean line loading per scenario, and mean trafo loading.
+# Complements Figure C (voltage variability) with a branch congestion overview.
+# =============================================================================
+scenario_keys   = list(all_results.keys())
+scenario_labels_br = [f"{l}\n{p}" for (l, p) in scenario_keys]
+mean_ll_all  = [
+    res['line_load'].mean()  if res['line_load'].size  > 0 else 0.0
+    for res in all_results.values()
+]
+mean_tl_all  = [
+    res['trafo_load'].mean() if res['trafo_load'].size > 0 else 0.0
+    for res in all_results.values()
+]
+max_ll_all   = [
+    res['line_load'].max(axis=0).mean()  if res['line_load'].size  > 0 else 0.0
+    for res in all_results.values()
+]
+max_tl_all   = [
+    res['trafo_load'].max(axis=0).mean() if res['trafo_load'].size > 0 else 0.0
+    for res in all_results.values()
+]
+
+fig, axes = plt.subplots(2, 1, figsize=(14, 12), constrained_layout=True)
+x_pos = np.arange(len(scenario_labels_br))
+width = 0.4
+
+for ax, mean_vals, max_vals, title in [
+    (axes[0], mean_ll_all,  max_ll_all,
+     "Line Loading Summary – Mean and Max (across elements) per Scenario"),
+    (axes[1], mean_tl_all,  max_tl_all,
+     "Transformer Loading Summary – Mean and Max (across elements) per Scenario"),
+]:
+    bars_mean = ax.bar(x_pos - width / 2, mean_vals,
+                       width=width, color=bar_colors, edgecolor='k',
+                       linewidth=0.8, alpha=0.85, label='Mean loading (%)')
+    bars_max  = ax.bar(x_pos + width / 2, max_vals,
+                       width=width, color=bar_colors, edgecolor='k',
+                       linewidth=0.8, alpha=0.45, hatch='//', label='Max element loading (%)')
+    ax.axhline(100, color='red', linestyle='--', linewidth=1.8,
+               label='100 % thermal limit')
+    # Annotate the baseline group
+    ax.annotate("Baseline",
+                xy=(baseline_idx - width / 2, mean_vals[baseline_idx]),
+                xytext=(baseline_idx - width / 2,
+                        mean_vals[baseline_idx] + max(mean_vals) * 0.06),
+                ha='center', fontsize=12, fontweight='bold', color='black',
+                arrowprops=dict(arrowstyle='->', lw=1.5, color='black'))
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(scenario_labels_br, fontsize=11)
+    ax.set_ylabel("Loading (%)")
+    ax.set_ylim(bottom=0)
+    ax.set_title(title)
+    ax.legend(loc='upper right')
+
+fig.suptitle("Branch Loading Summary – All Scenarios  (N=100 PPF samples)",
+             fontsize=15, fontweight='bold')
+savefig("F_branch_loading_summary.png")
 plt.close()
 
 print(f"\nAll figures saved to  {os.path.abspath(FIG_DIR)}")
